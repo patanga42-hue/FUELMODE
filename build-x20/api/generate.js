@@ -44,7 +44,7 @@ Pantry ingredients to prioritize: ${pantry.length ? pantry.join(', ') : 'none'}
 Use the pantry ingredients when provided. Respect the dietary preference completely. Favor realistic portions, useful protein and carbohydrates for training, and ordinary grocery-store ingredients. Include concise instructions and estimated macros for one serving. Macros are estimates, not medical advice. Return only the requested JSON object.`;
 
   try {
-    const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
+    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,16 +52,16 @@ Use the pantry ingredients when provided. Respect the dietary preference complet
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        input: [
+        messages: [
           {
             role: 'system',
             content: 'You are Fuel Mode, an athlete-focused recipe generator. Never claim to diagnose, treat, or prevent a medical condition.'
           },
           { role: 'user', content: prompt }
         ],
-        text: {
-          format: {
-            type: 'json_schema',
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
             name: 'fuel_mode_recipe',
             strict: true,
             schema: recipeSchema
@@ -76,10 +76,10 @@ Use the pantry ingredients when provided. Respect the dietary preference complet
       return response.status(502).json({ error: 'The recipe generator is temporarily unavailable.' });
     }
 
-    const output = data.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text;
+    const output = data.choices?.[0]?.message?.content;
     if (!output) return response.status(502).json({ error: 'The recipe generator returned an empty response.' });
 
-    return response.status(200).json(JSON.parse(output));
+    return response.status(200).json({ ...JSON.parse(output), aiGenerated: true });
   } catch (error) {
     console.error('Recipe generation error:', error);
     return response.status(502).json({ error: 'The recipe generator could not create a recipe right now.' });

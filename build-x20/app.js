@@ -110,7 +110,9 @@ async function generateRecipe() {
 }
 function setGenerating(isGenerating) {
   const button = document.querySelector('.generate-button');
+  const anotherButton = $('newRecipe');
   button.disabled = isGenerating;
+  anotherButton.disabled = isGenerating;
   $('generateText').textContent = isGenerating ? 'Cooking up a fresh match...' : state.mode === 'pantry' ? 'Make pantry fuel' : 'Generate my fuel';
 }
 async function createRecipe() {
@@ -121,6 +123,7 @@ async function createRecipe() {
   } catch (error) {
     const fallback = state.mode === 'pantry' ? makePantryRecipe(state.selectedPantry) : recipeForSettings();
     if (!fallback.error) {
+      fallback.localFallback = true;
       renderRecipe(fallback);
       $('pantryStatus').textContent = 'Showing a local match while the live recipe generator reconnects.';
     } else {
@@ -146,7 +149,7 @@ function renderRecipe(recipe) {
   $('ingredients').innerHTML = prioritized.map(x => `<li>${x}</li>`).join('');
   $('instructions').innerHTML = recipe.steps.map(x => `<li>${x}</li>`).join('');
   $('cookTime').textContent = recipe.time;
-  $('pantryNote').textContent = state.mode === 'pantry' && pantry.length ? `Uses all ${pantry.length} selected ingredient${pantry.length === 1 ? '' : 's'} · estimates based on standard portions` : `Vetted match for ${capitalize($('goal').value)} · ${$('cuisine').options[$('cuisine').selectedIndex].text}`;
+  $('pantryNote').textContent = recipe.aiGenerated ? 'AI-generated for your choices · macros are estimates' : recipe.localFallback ? 'Local fallback · AI generation is temporarily unavailable' : state.mode === 'pantry' && pantry.length ? `Uses all ${pantry.length} selected ingredient${pantry.length === 1 ? '' : 's'} · estimates based on standard portions` : `Vetted match for ${capitalize($('goal').value)} · ${$('cuisine').options[$('cuisine').selectedIndex].text}`;
   $('saveRecipe').classList.toggle('saved', state.saved.some(r => r.name === recipe.name));
   $('saveRecipe').textContent = state.saved.some(r => r.name === recipe.name) ? '♥' : '♡';
   $('resultArea').scrollIntoView({behavior:'smooth',block:'start'});
