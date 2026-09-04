@@ -97,6 +97,40 @@ function recipeForSettings() {
   const notCurrent = pool.filter(r => !state.current || r.name !== state.current.name);
   return (notCurrent.length ? notCurrent : pool)[Math.floor(Math.random() * (notCurrent.length ? notCurrent.length : pool.length))];
 }
+async function generateRecipe() {
+  const pantry = state.mode === 'pantry' ? state.selectedPantry : $('pantry').value.split(',').map(item => item.trim()).filter(Boolean);
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal: $('goal').value, diet: $('diet').value, meal: $('meal').value, cuisine: $('cuisine').value, pantry })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'The recipe generator is unavailable right now.');
+  return data;
+}
+function setGenerating(isGenerating) {
+  const button = document.querySelector('.generate-button');
+  button.disabled = isGenerating;
+  $('generateText').textContent = isGenerating ? 'Cooking up a fresh match...' : state.mode === 'pantry' ? 'Make pantry fuel' : 'Generate my fuel';
+}
+async function createRecipe() {
+  try {
+    setGenerating(true);
+    const recipe = await generateRecipe();
+    renderRecipe(recipe);
+  } catch (error) {
+    const fallback = state.mode === 'pantry' ? makePantryRecipe(state.selectedPantry) : recipeForSettings();
+    if (!fallback.error) {
+      renderRecipe(fallback);
+      $('pantryStatus').textContent = 'Showing a local match while the live recipe generator reconnects.';
+    } else {
+      $('emptyState').textContent = error.message;
+      $('emptyState').classList.remove('is-hidden');
+    }
+  } finally {
+    setGenerating(false);
+  }
+}
 function capitalize(value) { return value.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()); }
 function renderRecipe(recipe) {
   const typedPantry = $('pantry').value.split(',').map(x => x.trim()).filter(Boolean);
@@ -122,8 +156,8 @@ function persistPantry() { localStorage.setItem('fuel-mode-pantry', JSON.stringi
 function renderPantry() { $('savedPantry').classList.toggle('is-hidden', !state.pantry.length); $('selectionCount').textContent = `${state.selectedPantry.length} selected`; $('pantryChips').innerHTML = state.pantry.map((item, index) => `<button type="button" class="pantry-chip ${state.selectedPantry.includes(item) ? 'selected' : ''}" data-index="${index}" aria-pressed="${state.selectedPantry.includes(item)}">${item}</button>`).join(''); document.querySelectorAll('.pantry-chip').forEach(chip => chip.addEventListener('click', () => { const item = state.pantry[Number(chip.dataset.index)]; state.selectedPantry = state.selectedPantry.includes(item) ? state.selectedPantry.filter(value => value !== item) : [...state.selectedPantry, item]; persistPantry(); renderPantry(); })); }
 function toggleDrawer(open) { $('savedDrawer').classList.toggle('open',open); $('backdrop').classList.toggle('open',open); $('savedDrawer').setAttribute('aria-hidden',!open); }
 document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => { state.mode=button.dataset.mode; document.querySelectorAll('.mode').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',b===button)}); $('pantryEntry').classList.toggle('is-hidden',state.mode !== 'pantry'); $('generateText').textContent = state.mode === 'pantry' ? 'Make pantry fuel' : 'Generate my fuel'; }));
-$('generatorForm').addEventListener('submit', e => { e.preventDefault(); const typed = $('pantry').value.split(',').map(x => x.trim().toLowerCase()).filter(Boolean); if (state.mode === 'pantry' && typed.length) { state.pantry = [...new Set([...state.pantry, ...typed])]; state.selectedPantry = [...new Set([...state.selectedPantry, ...typed])]; $('pantry').value = ''; persistPantry(); renderPantry(); } if (state.mode === 'pantry') { if (!state.selectedPantry.length) { $('pantryStatus').textContent = 'Choose at least two ingredients to make pantry fuel.'; return; } const recipe = makePantryRecipe(state.selectedPantry); if (recipe.error) { $('pantryStatus').textContent = recipe.error; return; } renderRecipe(recipe); } else { const recipe = recipeForSettings(); if (recipe.error) { $('emptyState').textContent = recipe.error; $('emptyState').classList.remove('is-hidden'); return; } renderRecipe(recipe); } });
-$('newRecipe').addEventListener('click',()=>{ if (state.mode !== 'pantry' || !state.selectedPantry.length) { const recipe = recipeForSettings(); if (recipe.error) { $('emptyState').textContent = recipe.error; $('emptyState').classList.remove('is-hidden'); return; } return renderRecipe(recipe); } const recipe = makePantryRecipe(state.selectedPantry); if (recipe.error) { $('pantryStatus').textContent = recipe.error; return; } renderRecipe(recipe); });
+$('generatorForm').addEventListener('submit', async e => { e.preventDefault(); const typed = $('pantry').value.split(',').map(x => x.trim().toLowerCase()).filter(Boolean); if (state.mode === 'pantry' && typed.length) { state.pantry = [...new Set([...state.pantry, ...typed])]; state.selectedPantry = [...new Set([...state.selectedPantry, ...typed])]; $('pantry').value = ''; persistPantry(); renderPantry(); } if (state.mode === 'pantry' && state.selectedPantry.length < 2) { $('pantryStatus').textContent = 'Choose at least two ingredients to make pantry fuel.'; return; } await createRecipe(); });
+$('newRecipe').addEventListener('click', async () => { if (state.mode === 'pantry' && state.selectedPantry.length < 2) { $('pantryStatus').textContent = 'Choose at least two ingredients to make pantry fuel.'; return; } await createRecipe(); });
 $('saveRecipe').addEventListener('click',()=>{if(!state.current)return;const exists=state.saved.findIndex(r=>r.name===state.current.name);if(exists>=0)state.saved.splice(exists,1);else state.saved.unshift({...state.current,goal:$('goal').options[$('goal').selectedIndex].text,meal:$('meal').value});localStorage.setItem('fuel-mode-saved',JSON.stringify(state.saved));renderSaved();renderRecipe(state.current);});
 $('savedButton').addEventListener('click',()=>toggleDrawer(true)); $('closeDrawer').addEventListener('click',()=>toggleDrawer(false)); $('backdrop').addEventListener('click',()=>toggleDrawer(false)); renderSaved();
 $('savePantry').addEventListener('click', () => { const items = $('pantry').value.split(',').map(x => x.trim().toLowerCase()).filter(Boolean); if (!items.length) { $('pantryStatus').textContent = 'Add a few ingredients first.'; return; } state.pantry = [...new Set([...state.pantry, ...items])]; state.selectedPantry = [...new Set([...state.selectedPantry, ...items])]; persistPantry(); $('pantry').value = ''; $('pantryStatus').textContent = `${items.length} ingredient${items.length === 1 ? '' : 's'} added and selected`; renderPantry(); });
