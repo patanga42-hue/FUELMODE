@@ -1,15 +1,14 @@
 const recipeSchema = {
-  type: 'object',
-  additionalProperties: false,
+  type: 'OBJECT',
   required: ['name', 'description', 'art', 'ingredients', 'steps', 'macros', 'time'],
   properties: {
-    name: { type: 'string' },
-    description: { type: 'string' },
-    art: { type: 'string' },
-    ingredients: { type: 'array', items: { type: 'string' } },
-    steps: { type: 'array', items: { type: 'string' } },
-    macros: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4 },
-    time: { type: 'string' }
+    name: { type: 'STRING' },
+    description: { type: 'STRING' },
+    art: { type: 'STRING' },
+    ingredients: { type: 'ARRAY', items: { type: 'STRING' } },
+    steps: { type: 'ARRAY', items: { type: 'STRING' } },
+    macros: { type: 'ARRAY', items: { type: 'STRING' } },
+    time: { type: 'STRING' }
   }
 };
 
@@ -23,7 +22,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'Method not allowed.' });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return response.status(500).json({ error: 'Recipe generation is not configured yet.' });
   }
 
@@ -44,39 +43,31 @@ Pantry ingredients to prioritize: ${pantry.length ? pantry.join(', ') : 'none'}
 Use the pantry ingredients when provided. Respect the dietary preference completely. Favor realistic portions, useful protein and carbohydrates for training, and ordinary grocery-store ingredients. Include concise instructions and estimated macros for one serving. Macros are estimates, not medical advice. Return only the requested JSON object.`;
 
   try {
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are Fuel Mode, an athlete-focused recipe generator. Never claim to diagnose, treat, or prevent a medical condition.'
-          },
-          { role: 'user', content: prompt }
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'fuel_mode_recipe',
-            strict: true,
-            schema: recipeSchema
-          }
+        systemInstruction: {
+          parts: [{ text: 'You are Fuel Mode, an athlete-focused recipe generator. Never claim to diagnose, treat, or prevent a medical condition.' }]
+        },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: recipeSchema,
+          temperature: 0.9
         }
       })
     });
 
-    const data = await openAIResponse.json();
-    if (!openAIResponse.ok) {
-      console.error('OpenAI request failed:', data);
+    const data = await geminiResponse.json();
+    if (!geminiResponse.ok) {
+      console.error('Gemini request failed:', data);
       return response.status(502).json({ error: 'The recipe generator is temporarily unavailable.' });
     }
 
-    const output = data.choices?.[0]?.message?.content;
+    const output = data.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
     if (!output) return response.status(502).json({ error: 'The recipe generator returned an empty response.' });
 
     return response.status(200).json({ ...JSON.parse(output), aiGenerated: true });
