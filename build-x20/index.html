@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fuel Mode — recipes for how you train</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .hero { padding: 52px 2px 44px; }
+      .hero-orb { height: 160px; width: 160px; }
+      .hero-orb:before { height: 122px; width: 122px; }
+      .hero-orb span { top: 21px; left: 28px; }
+      .hero-orb b { font-size: 17px; }
+      .hero-copy { margin-top: 18px; }
+      .generator { padding-top: 24px; }
+      .choices-grid { grid-template-columns: repeat(4, 1fr); }
+      .engine-note { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 10px 0 0; }
+      .pantry-head, .pantry-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .selection-count { font: 10px 'DM Mono', monospace; color: var(--orange); }
+      .pantry-chips { padding-right: 0; margin: 10px 0 12px; }
+      .pantry-chip { border: 1px solid var(--line); background: transparent; padding: 6px 9px; font: 600 11px Manrope; color: var(--ink); cursor: pointer; }
+      .pantry-chip::before { content: '○'; margin-right: 5px; color: var(--muted); }
+      .pantry-chip.selected { background: var(--lime); border-color: var(--ink); }
+      .pantry-chip.selected::before { content: '✓'; color: var(--ink); }
+      .clear-pantry { position: static; }
+      @media (max-width: 650px) { .hero { padding: 38px 0 35px; } .hero-orb { height: 88px; width: 88px; } .hero-orb:before { height: 68px; width: 68px; } .hero-orb span { top: 12px; left: 17px; } .hero-orb b { font-size: 10px; } }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <nav class="topbar">
+        <a class="brand" href="#top" aria-label="Fuel Mode home"><span class="brand-mark">F</span><span>fuel mode</span></a>
+        <div class="nav-meta"><span class="live-dot"></span> FOR ATHLETES</div>
+        <button class="icon-button" id="savedButton" aria-label="View saved recipes">♡<span id="savedCount">0</span></button>
+      </nav>
+
+      <section class="hero" id="top">
+        <div>
+          <p class="eyebrow">MEALS FOR ATHLETES</p>
+          <h1>Fuel every<br /><em>rep, run &amp; rest.</em></h1>
+          <p class="hero-copy">Easy meals that support your lift, your recovery, and the work you put in.</p>
+        </div>
+        <div class="hero-orb" aria-hidden="true"><span>01</span><i></i><b>FUEL<br />YOUR<br />FORM</b></div>
+      </section>
+
+      <section class="generator" aria-labelledby="generator-title">
+        <div class="section-heading"><p class="eyebrow">BUILD A MEAL</p><h2 id="generator-title">What are we making?</h2></div>
+        <div class="mode-switch" role="tablist" aria-label="Recipe generator mode">
+          <button class="mode active" id="randomTab" role="tab" aria-selected="true" data-mode="random"><span class="mode-icon">✦</span><span><strong>Random fuel</strong><small>Surprise me with a match</small></span></button>
+          <button class="mode" id="pantryTab" role="tab" aria-selected="false" data-mode="pantry"><span class="mode-icon">⌂</span><span><strong>Pantry mode</strong><small>Make use of what you've got</small></span></button>
+        </div>
+
+        <form id="generatorForm">
+          <div class="choices-grid">
+            <label class="field"><span>Fuel goal</span><select id="goal"><option value="pre">Pre-workout</option><option value="recovery">Recovery</option><option value="maintenance">Maintenance</option></select></label>
+            <label class="field"><span>Dietary preference</span><select id="diet"><option value="any">No preference</option><option value="highProtein">High protein</option><option value="vegan">Vegan</option><option value="vegetarian">Vegetarian</option><option value="glutenFree">Gluten-free</option></select></label>
+            <label class="field"><span>Meal type</span><select id="meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option></select></label>
+            <label class="field"><span>Cuisine inspiration</span><select id="cuisine"><option value="any">No preference</option><option value="american">American</option><option value="mexican">Mexican</option><option value="italian">Italian</option><option value="chinese">Chinese</option><option value="westAfrican">West African</option></select></label>
+          </div>
+          <p class="engine-note">Built from curated cooking templates. Pantry recipes use standard portions; macros are estimates, not medical or dietary advice.</p>
+          <div class="pantry-entry is-hidden" id="pantryEntry">
+            <label class="field pantry-field" for="pantry"><span>Add ingredients to your pantry</span><input id="pantry" type="text" placeholder="e.g. 6 oz steak, 2 eggs, 1 cup rice" autocomplete="off" /><small>Include amounts when you know them, separated by commas. They carry into the recipe; otherwise Fuel Mode uses standard portions.</small></label>
+            <div class="pantry-save-row"><p id="pantryStatus">Add ingredients, then choose what you want to cook with.</p><button type="button" id="savePantry" class="small-button">Add ingredients</button></div>
+            <div class="saved-pantry is-hidden" id="savedPantry"><div class="pantry-head"><span class="saved-pantry-label">CHOOSE INGREDIENTS TO USE</span><span class="selection-count" id="selectionCount">0 selected</span></div><div id="pantryChips" class="pantry-chips"></div><div class="pantry-actions"><button type="button" id="clearSelected" class="clear-pantry">Clear selection</button><button type="button" id="clearPantry" class="clear-pantry">Clear pantry</button></div></div>
+          </div>
+          <button class="generate-button" type="submit"><span id="generateText">Generate my fuel</span><span class="button-arrow">↗</span></button>
+        </form>
+      </section>
+
+      <section class="result-area" id="resultArea" aria-live="polite">
+        <div class="empty-state" id="emptyState"><div class="empty-spark">✦</div><p>Your next great meal starts here.</p><span>Pick your mode, set your preferences, and get cooking.</span></div>
+        <article class="recipe-card is-hidden" id="recipeCard">
+          <div class="recipe-visual"><div class="visual-grain"></div><span class="recipe-number" id="recipeNumber">01</span><div class="meal-art" id="mealArt">🥣</div><p id="visualMeal">BREAKFAST</p></div>
+          <div class="recipe-content">
+            <div class="recipe-topline"><span class="tag" id="goalTag">PRE-WORKOUT</span><button id="saveRecipe" class="save-recipe" aria-label="Save this recipe">♡</button></div>
+            <h2 id="recipeName">Recipe name</h2><p class="recipe-description" id="recipeDescription"></p>
+            <div class="macros" id="macros"></div>
+            <div class="recipe-columns"><div><h3>You'll need</h3><ul id="ingredients"></ul></div><div><h3>Make it happen</h3><ol id="instructions"></ol></div></div>
+            <div class="recipe-footer"><span id="cookTime">10 min</span><span>·</span><span id="pantryNote">Built for your goal</span><button class="text-button" id="newRecipe">Try another <span>→</span></button></div>
+          </div>
+        </article>
+      </section>
+    </main>
+    <aside class="saved-drawer" id="savedDrawer" aria-hidden="true"><div class="drawer-head"><h2>Saved fuel</h2><button id="closeDrawer" class="icon-button" aria-label="Close saved recipes">×</button></div><div id="savedList" class="saved-list"><p class="drawer-empty">Nothing saved yet.<br />Keep the good ones close.</p></div></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
