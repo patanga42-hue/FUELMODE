@@ -30,6 +30,7 @@
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#generator-title">Skip to meal builder</a>
     <main class="app-shell">
       <nav class="topbar">
         <a class="brand" href="#top" aria-label="Fuel Mode home"><span class="brand-mark">F</span><span>fuel mode</span></a>
@@ -53,7 +54,7 @@
           <button class="mode" id="pantryTab" role="tab" aria-selected="false" data-mode="pantry"><span class="mode-icon">⌂</span><span><strong>Pantry mode</strong><small>Make use of what you've got</small></span></button>
         </div>
 
-        <form id="generatorForm">
+        <form id="generatorForm" aria-describedby="formStatus">
           <div class="choices-grid">
             <label class="field"><span>Fuel goal</span><select id="goal"><option value="pre">Pre-workout</option><option value="recovery">Recovery</option><option value="maintenance">Maintenance</option></select></label>
             <label class="field"><span>Dietary preference</span><select id="diet"><option value="any">No preference</option><option value="highProtein">High protein</option><option value="vegan">Vegan</option><option value="vegetarian">Vegetarian</option><option value="glutenFree">Gluten-free</option></select></label>
@@ -62,17 +63,18 @@
           </div>
           <p class="engine-note">Built from curated cooking templates. Pantry recipes use standard portions; macros are estimates, not medical or dietary advice.</p>
           <div class="pantry-entry is-hidden" id="pantryEntry">
-            <label class="field pantry-field" for="pantry"><span>Add ingredients to your pantry</span><input id="pantry" type="text" placeholder="e.g. 6 oz steak, 2 eggs, 1 cup rice" autocomplete="off" /><small>Include amounts when you know them, separated by commas. They carry into the recipe; otherwise Fuel Mode uses standard portions.</small></label>
+            <label class="field pantry-field" for="pantry"><span>Add ingredients to your pantry</span><input id="pantry" name="pantry" type="text" placeholder="e.g. 6 oz steak, 2 eggs, 1 cup rice…" autocomplete="off" /><small>Include amounts when you know them, separated by commas. They carry into the recipe; otherwise Fuel Mode uses standard portions.</small></label>
             <div class="pantry-save-row"><p id="pantryStatus">Add ingredients, then choose what you want to cook with.</p><button type="button" id="savePantry" class="small-button">Add ingredients</button></div>
             <div class="saved-pantry is-hidden" id="savedPantry"><div class="pantry-head"><span class="saved-pantry-label">CHOOSE INGREDIENTS TO USE</span><span class="selection-count" id="selectionCount">0 selected</span></div><div id="pantryChips" class="pantry-chips"></div><div class="pantry-actions"><button type="button" id="clearSelected" class="clear-pantry">Clear selection</button><button type="button" id="clearPantry" class="clear-pantry">Clear pantry</button></div></div>
           </div>
-          <button class="generate-button" type="submit"><span id="generateText">Generate my fuel</span><span class="button-arrow">↗</span></button>
+          <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
+          <button class="generate-button" type="submit"><span id="generateText">Generate my fuel</span><span class="button-arrow" aria-hidden="true">↗</span></button>
         </form>
       </section>
 
       <section class="result-area" id="resultArea" aria-live="polite">
         <div class="empty-state" id="emptyState"><div class="empty-spark">✦</div><p>Your next great meal starts here.</p><span>Pick your mode, set your preferences, and get cooking.</span></div>
-        <article class="recipe-card is-hidden" id="recipeCard">
+        <article class="recipe-card is-hidden" id="recipeCard" aria-labelledby="recipeName">
           <div class="recipe-visual"><div class="visual-grain"></div><span class="recipe-number" id="recipeNumber">01</span><div class="meal-art" id="mealArt">🥣</div><p id="visualMeal">BREAKFAST</p></div>
           <div class="recipe-content">
             <div class="recipe-topline"><span class="tag" id="goalTag">PRE-WORKOUT</span><button id="saveRecipe" class="save-recipe" aria-label="Save this recipe">♡</button></div>
@@ -84,7 +86,7 @@
         </article>
       </section>
     </main>
-    <aside class="saved-drawer" id="savedDrawer" aria-hidden="true"><div class="drawer-head"><h2>Saved fuel</h2><button id="closeDrawer" class="icon-button" aria-label="Close saved recipes">×</button></div><div id="savedList" class="saved-list"><p class="drawer-empty">Nothing saved yet.<br />Keep the good ones close.</p></div></aside>
+    <aside class="saved-drawer" id="savedDrawer" aria-hidden="true" aria-labelledby="saved-title" role="dialog"><div class="drawer-head"><h2 id="saved-title">Saved fuel</h2><button id="closeDrawer" class="icon-button" aria-label="Close saved recipes">×</button></div><div id="savedList" class="saved-list"><p class="drawer-empty">Nothing saved yet.<br />Keep the good ones close.</p></div></aside>
     <div class="backdrop" id="backdrop"></div>
     <script src="app.js"></script>
   </body>
