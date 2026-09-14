@@ -99,11 +99,17 @@ function recipeForSettings() {
 }
 async function generateRecipe() {
   const pantry = state.mode === 'pantry' ? state.selectedPantry : $('pantry').value.split(',').map(item => item.trim()).filter(Boolean);
-  const response = await fetch('/api/generate', {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let response;
+  try {
+    response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ goal: $('goal').value, diet: $('diet').value, meal: $('meal').value, cuisine: $('cuisine').value, pantry })
-  });
+    body: JSON.stringify({ goal: $('goal').value, diet: $('diet').value, meal: $('meal').value, cuisine: $('cuisine').value, pantry }),
+    signal: controller.signal
+    });
+  } finally { clearTimeout(timeout); }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'The recipe generator is unavailable right now.');
   return data;
@@ -114,6 +120,8 @@ function setGenerating(isGenerating) {
   button.disabled = isGenerating;
   anotherButton.disabled = isGenerating;
   $('generateText').textContent = isGenerating ? 'Cooking up a fresh match...' : state.mode === 'pantry' ? 'Make pantry fuel' : 'Generate my fuel';
+  $('formStatus').textContent = isGenerating ? 'Generating a recipe…' : '';
+  button.setAttribute('aria-busy', isGenerating);
 }
 async function createRecipe() {
   try {
@@ -126,9 +134,14 @@ async function createRecipe() {
       fallback.localFallback = true;
       renderRecipe(fallback);
       $('pantryStatus').textContent = 'Showing a local match while the live recipe generator reconnects.';
+      $('formStatus').textContent = 'Live generation is unavailable, so a local match is ready.';
     } else {
-      $('emptyState').textContent = error.message;
+      $('emptyState').replaceChildren();
+      const message = document.createElement('p');
+      message.textContent = error.name === 'AbortError' ? 'The live generator took too long. Try again for a local match.' : error.message;
+      $('emptyState').append(message);
       $('emptyState').classList.remove('is-hidden');
+      $('formStatus').textContent = message.textContent;
     }
   } finally {
     setGenerating(false);
@@ -144,19 +157,26 @@ function renderRecipe(recipe) {
   $('mealArt').textContent = recipe.art; $('visualMeal').textContent = $('meal').value.toUpperCase();
   $('goalTag').textContent = $('goal').options[$('goal').selectedIndex].text.toUpperCase();
   $('recipeNumber').textContent = String(Math.floor(Math.random()*89)+10);
-  $('macros').innerHTML = recipe.macros.map((m,i) => { const [value,...rest] = m.split(' '); return `<div class="macro"><b>${value}</b><span>${rest.join(' ').toUpperCase()}</span></div>` }).join('');
+  $('macros').replaceChildren(...recipe.macros.map(m => {
+    const [value, ...rest] = String(m).split(' ');
+    const macro = document.createElement('div'); macro.className = 'macro';
+    const strong = document.createElement('b'); strong.textContent = value;
+    const label = document.createElement('span'); label.textContent = rest.join(' ').toUpperCase();
+    macro.append(strong, label); return macro;
+  }));
   const prioritized = recipe.pantryGenerated ? recipe.ingredients : state.mode === 'pantry' && pantry.length ? [...pantry.slice(0,3), ...recipe.ingredients].filter((v,i,a)=>a.indexOf(v)===i).slice(0,6) : recipe.ingredients;
-  $('ingredients').innerHTML = prioritized.map(x => `<li>${x}</li>`).join('');
-  $('instructions').innerHTML = recipe.steps.map(x => `<li>${x}</li>`).join('');
+  const makeItems = values => values.map(value => { const item = document.createElement('li'); item.textContent = String(value); return item; });
+  $('ingredients').replaceChildren(...makeItems(prioritized));
+  $('instructions').replaceChildren(...makeItems(recipe.steps));
   $('cookTime').textContent = recipe.time;
   $('pantryNote').textContent = recipe.aiGenerated ? 'AI-generated for your choices · macros are estimates' : recipe.localFallback ? 'Local fallback · AI generation is temporarily unavailable' : state.mode === 'pantry' && pantry.length ? `Uses all ${pantry.length} selected ingredient${pantry.length === 1 ? '' : 's'} · estimates based on standard portions` : `Vetted match for ${capitalize($('goal').value)} · ${$('cuisine').options[$('cuisine').selectedIndex].text}`;
   $('saveRecipe').classList.toggle('saved', state.saved.some(r => r.name === recipe.name));
   $('saveRecipe').textContent = state.saved.some(r => r.name === recipe.name) ? '♥' : '♡';
   $('resultArea').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function renderSaved() { $('savedCount').textContent = state.saved.length; $('savedList').innerHTML = state.saved.length ? state.saved.map(r => `<div class="saved-item"><div class="saved-item-art">${r.art}</div><div><strong>${r.name}</strong><span>${r.goal} · ${r.meal}</span></div></div>`).join('') : '<p class="drawer-empty">Nothing saved yet.<br />Keep the good ones close.</p>'; }
+function renderSaved() { $('savedCount').textContent = state.saved.length; if (!state.saved.length) { $('savedList').innerHTML = '<p class="drawer-empty">Nothing saved yet.<br />Keep the good ones close.</p>'; return; } $('savedList').replaceChildren(...state.saved.map(r => { const item = document.createElement('div'); item.className='saved-item'; const art=document.createElement('div'); art.className='saved-item-art'; art.textContent=String(r.art || '🥣'); const body=document.createElement('div'); const name=document.createElement('strong'); name.textContent=String(r.name || 'Saved recipe'); const meta=document.createElement('span'); meta.textContent=`${r.goal || 'Fuel'} · ${r.meal || 'meal'}`; body.append(name,meta); item.append(art,body); return item; })); }
 function persistPantry() { localStorage.setItem('fuel-mode-pantry', JSON.stringify(state.pantry)); localStorage.setItem('fuel-mode-selected-pantry', JSON.stringify(state.selectedPantry)); }
-function renderPantry() { $('savedPantry').classList.toggle('is-hidden', !state.pantry.length); $('selectionCount').textContent = `${state.selectedPantry.length} selected`; $('pantryChips').innerHTML = state.pantry.map((item, index) => `<button type="button" class="pantry-chip ${state.selectedPantry.includes(item) ? 'selected' : ''}" data-index="${index}" aria-pressed="${state.selectedPantry.includes(item)}">${item}</button>`).join(''); document.querySelectorAll('.pantry-chip').forEach(chip => chip.addEventListener('click', () => { const item = state.pantry[Number(chip.dataset.index)]; state.selectedPantry = state.selectedPantry.includes(item) ? state.selectedPantry.filter(value => value !== item) : [...state.selectedPantry, item]; persistPantry(); renderPantry(); })); }
+function renderPantry() { $('savedPantry').classList.toggle('is-hidden', !state.pantry.length); $('selectionCount').textContent = `${state.selectedPantry.length} selected`; $('pantryChips').replaceChildren(...state.pantry.map((item, index) => { const chip=document.createElement('button'); chip.type='button'; chip.className=`pantry-chip ${state.selectedPantry.includes(item) ? 'selected' : ''}`; chip.dataset.index=index; chip.setAttribute('aria-pressed', state.selectedPantry.includes(item)); chip.textContent=item; chip.addEventListener('click', () => { state.selectedPantry = state.selectedPantry.includes(item) ? state.selectedPantry.filter(value => value !== item) : [...state.selectedPantry, item]; persistPantry(); renderPantry(); }); return chip; })); }
 function toggleDrawer(open) { $('savedDrawer').classList.toggle('open',open); $('backdrop').classList.toggle('open',open); $('savedDrawer').setAttribute('aria-hidden',!open); }
 document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => { state.mode=button.dataset.mode; document.querySelectorAll('.mode').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',b===button)}); $('pantryEntry').classList.toggle('is-hidden',state.mode !== 'pantry'); $('generateText').textContent = state.mode === 'pantry' ? 'Make pantry fuel' : 'Generate my fuel'; }));
 $('generatorForm').addEventListener('submit', async e => { e.preventDefault(); const typed = $('pantry').value.split(',').map(x => x.trim().toLowerCase()).filter(Boolean); if (state.mode === 'pantry' && typed.length) { state.pantry = [...new Set([...state.pantry, ...typed])]; state.selectedPantry = [...new Set([...state.selectedPantry, ...typed])]; $('pantry').value = ''; persistPantry(); renderPantry(); } if (state.mode === 'pantry' && state.selectedPantry.length < 2) { $('pantryStatus').textContent = 'Choose at least two ingredients to make pantry fuel.'; return; } await createRecipe(); });
